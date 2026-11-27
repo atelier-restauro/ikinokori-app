@@ -1,0 +1,148 @@
+# イキノコリ！：iPhone用（TestFlight へ）と Android用（aab）を組み立てる設定
+# main に変更が来ると、iOS・Android とも自動でビルドが始まる（Re:Museum と同じ仕組み）
+# 説明だけの変更（*.md）・道具（tools/）・フォントの元（fonts/）だけの変更ではビルドしない
+workflows:
+  ios-testflight:
+    name: iOS TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+    when:
+      changeset:
+        excludes:
+          - '**/*.md'
+          - 'tools/**'
+          - 'fonts/**'
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      node: 20
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: ゲーム本体と画像を所定の場所へ
+        script: |
+          mkdir -p www assets
+          cp game.html www/index.html
+          cp icon.png assets/icon-only.png
+          cp icon.png assets/icon-foreground.png
+          cp splash.png assets/splash.png
+          cp splash.png assets/splash-dark.png
+      - name: 部品のインストール
+        script: |
+          # 部品のダウンロードがたまに時間切れになるので、最大3回やり直す
+          for i in 1 2 3; do npm install && exit 0; echo "npm install 失敗（${i}回目）。少し待ってやり直します"; sleep $((i*20)); done; exit 1
+      - name: iPhone用プロジェクトを作る
+        script: npx cap add ios
+      - name: アイコンと起動画面を作る
+        script: npx @capacitor/assets generate --ios --iconBackgroundColor '#16110b' --splashBackgroundColor '#16110b' --splashBackgroundColorDark '#16110b'
+      - name: 縦画面・iPhoneのみ・表示名などの設定
+        script: |
+          PLIST=ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Delete :UISupportedInterfaceOrientations" $PLIST || true
+          /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations array" $PLIST
+          /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationPortrait" $PLIST
+          /usr/libexec/PlistBuddy -c "Delete :UISupportedInterfaceOrientations~ipad" $PLIST || true
+          /usr/libexec/PlistBuddy -c "Add :UIRequiresFullScreen bool true" $PLIST || true
+          /usr/libexec/PlistBuddy -c "Add :UIStatusBarHidden bool true" $PLIST || true
+          /usr/libexec/PlistBuddy -c "Add :UIViewControllerBasedStatusBarAppearance bool false" $PLIST || true
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" $PLIST || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string ja" $PLIST || /usr/libexec/PlistBuddy -c "Set :CFBundleDevelopmentRegion ja" $PLIST
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleLocalizations" $PLIST || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations array" $PLIST
+          /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:0 string ja" $PLIST
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName イキノコリ！" $PLIST || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string イキノコリ！" $PLIST
+          sed -i '' 's/TARGETED_DEVICE_FAMILY = "1,2";/TARGETED_DEVICE_FAMILY = 1;/g' ios/App/App.xcodeproj/project.pbxproj
+      - name: ゲームをアプリに入れる
+        script: npx cap sync ios
+      - name: 署名の準備
+        script: |
+          set -e
+          unset CERTIFICATE_PRIVATE_KEY
+          ssh-keygen -t rsa -b 2048 -m PEM -f /tmp/cert_key -q -N ""
+          for T in DISTRIBUTION IOS_DISTRIBUTION; do
+            for ID in $(app-store-connect certificates list --type $T --json | python3 -c "import json,sys;[print(c['id']) for c in json.load(sys.stdin)]"); do
+              app-store-connect certificates delete "$ID" || true
+            done
+          done
+          app-store-connect fetch-signing-files "jp.ikinokori.app" --type IOS_APP_STORE --certificate-key=@file:/tmp/cert_key --create
+          keychain initialize
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: ビルド番号を上げる
+        script: |
+          cd ios/App
+          agvtool new-version -all $BUILD_NUMBER
+      - name: アプリを組み立てる
+        script: xcode-project build-ipa --workspace "ios/App/App.xcworkspace" --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  android:
+    name: Android
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+    when:
+      changeset:
+        excludes:
+          - '**/*.md'
+          - 'tools/**'
+          - 'fonts/**'
+    environment:
+      android_signing:
+        - upload
+      node: 20
+      java: 21
+    scripts:
+      - name: ゲーム本体と画像を所定の場所へ
+        script: |
+          mkdir -p www assets
+          cp game.html www/index.html
+          cp icon.png assets/icon-only.png
+          cp icon.png assets/icon-foreground.png
+          cp icon.png assets/icon-background.png
+          cp splash.png assets/splash.png
+          cp splash.png assets/splash-dark.png
+      - name: 部品のインストール
+        script: |
+          for i in 1 2 3; do npm install && exit 0; echo "npm install 失敗（${i}回目）。少し待ってやり直します"; sleep $((i*20)); done; exit 1
+      - name: Android用プロジェクトを作る
+        script: npx cap add android
+      - name: アイコンと起動画面を作る
+        script: npx @capacitor/assets generate --android --iconBackgroundColor '#16110b' --splashBackgroundColor '#16110b' --splashBackgroundColorDark '#16110b'
+      - name: 縦画面・バージョン番号の設定
+        script: |
+          sed -i '' 's/<activity/<activity android:screenOrientation="portrait"/' android/app/src/main/AndroidManifest.xml
+          sed -i '' "s/versionCode [0-9]*/versionCode $BUILD_NUMBER/" android/app/build.gradle
+          sed -i '' 's/minSdkVersion = [0-9]*/minSdkVersion = 24/' android/variables.gradle
+          sed -i '' 's/compileSdkVersion = [0-9]*/compileSdkVersion = 36/; s/targetSdkVersion = [0-9]*/targetSdkVersion = 36/' android/variables.gradle
+          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+          cp MainActivity.java android/app/src/main/java/jp/ikinokori/app/MainActivity.java
+      - name: ゲームをアプリに入れる
+        script: npx cap sync android
+      - name: アプリを組み立てる
+        script: |
+          cd android
+          ./gradlew bundleRelease
+      - name: 署名する
+        script: |
+          jarsigner -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$CM_KEYSTORE_PATH" -storepass "$CM_KEYSTORE_PASSWORD" -keypass "$CM_KEY_PASSWORD" android/app/build/outputs/bundle/release/app-release.aab "$CM_KEY_ALIAS"
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
