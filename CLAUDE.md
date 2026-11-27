@@ -26,7 +26,10 @@
 
 ## 状況
 - 11/27：箱（このリポジトリ）を作成。game.html β0.1（2026-11-27 の公開版から）・ビルド設定・アイコン案A（地層と海、右上から隕石が落ちてくる。11/27 かいと決定）・起動画面。
-- かいとの残り：Apple Developer でアプリID登録 → App Store Connect で新規App → Codemagic にこのリポジトリをつなぐ → 最初のビルド → Play Console で新規アプリ＋クローズドテスト。
+- 11/27 夜：iOS ビルド1が TestFlight で「審査待ち」（外部テスト。グループ「友達テスト」・テスト情報入力済み）。Android はクローズドテストに公開済み（versionCode 2。最初のビルドは MainActivity の型のミスで失敗→直した）。Play のストア掲載・アプリのコンテンツ・レーティングも入力済み。
+- 次：iOS の審査が通ったら友達に招待メールが届く（友達は TestFlight アプリを入れておく）。Android は Play Console のクローズドテスト →「テスター」タブの「ウェブで参加」リンクを友達に送る（メールリストに入れた Google アカウントで開く）。
+- 次のビルドで入るもの：iOS の対応バージョンを 15 以上に（ITMS-90068、[skip ci] で入れただけ）。iOS 27 SDK は Codemagic の xcode: latest で自動。
+- TestFlight の「テストの内容」（β0.1）：チュートリアルの分かりやすさ／白亜紀のきつさ／恐竜・翼竜になれたか／ノッチやバーで隠れないか／音／閉じて開き直してもつづきが残るか。
 - 友達テスト：3〜5人・iOS と Android のクローズドテスト。ランキングは試さない。Play で一般公開するには、このアプリで12人以上が14日続けてクローズドテストに参加している必要がある（アプリごと）。
 - プライバシーポリシー：https://atelier-restauro.github.io/ikinokori-privacy.html （サイトのリポジトリ直下 ikinokori-privacy.html。11/27。問い合わせは remuseum.m@gmail.com）。広告・課金を入れるときは書きかえる。
 - 「感想を送る」のGoogleフォームは、かいとが作ったら FEEDBACK_URL に入れる。
