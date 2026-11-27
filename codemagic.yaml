@@ -39,7 +39,13 @@ workflows:
           # 部品のダウンロードがたまに時間切れになるので、最大3回やり直す
           for i in 1 2 3; do npm install && exit 0; echo "npm install 失敗（${i}回目）。少し待ってやり直します"; sleep $((i*20)); done; exit 1
       - name: iPhone用プロジェクトを作る
-        script: npx cap add ios
+        script: |
+          # Apple の決まりで、2027年4月から iOS 15 以上が必要（11/27 のメール ITMS-90068）。最初の pod install は失敗してよい（15 に直してから「ゲームをアプリに入れる」でやり直す）
+          npx cap add ios || echo "pod install はあとでやり直します"
+          test -d ios/App/App.xcodeproj
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' ios/App/App.xcodeproj/project.pbxproj
+          sed -i '' "s/platform :ios, '[0-9.]*'/platform :ios, '15.0'/" ios/App/Podfile
+          grep -n "platform :ios" ios/App/Podfile
       - name: アイコンと起動画面を作る
         script: npx @capacitor/assets generate --ios --iconBackgroundColor '#16110b' --splashBackgroundColor '#16110b' --splashBackgroundColorDark '#16110b'
       - name: 縦画面・iPhoneのみ・表示名などの設定
