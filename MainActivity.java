@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.webkit.WebView;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -24,7 +25,7 @@ public class MainActivity extends BridgeActivity {
     }
     getWindow().getDecorView().setBackgroundColor(0xFF0B0704);
     try {
-      View wv = getBridge().getWebView();
+      WebView wv = getBridge().getWebView();
       wv.getSettings().setTextZoom(100);
       ViewCompat.setOnApplyWindowInsetsListener(wv, (v, insets) -> {
         Insets cut = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
